@@ -46,7 +46,7 @@ def get_arguments():
     return arguments
 
 
-def pretrain(config):   
+def pretrain(config):
     source_data = pd.read_csv(os.path.join("data", config.dataset, f"{config.dataset}_source.csv"))
     source_event = source_data[:config.event_size/2]
 

@@ -14,11 +14,11 @@ Datasets are used in the following file structure:
 │  │   ├── disaster_source.csv
 │  │   ├── disaster_target.csv
 │  ├── review
-│  │   ├── hotel_review.csv
-│  ├── news
-│  │   ├── news.csv
+│  │   ├── review_source.csv
+│  │   ├── review_target.csv
 │  ├── socialmedia
-│  │   ├── reddit.csv
+│  │   ├── socialmedia_source.csv
+│  │   ├── socialmedia_target.csv
 ```
 
 - `cs_source.csv`: You can download it from: [here](https://github.com/behzadanksu/cybertweets)
