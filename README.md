@@ -26,8 +26,8 @@ Datasets are used in the following file structure:
 - `disaster_source.csv`: You can download it from: [here](https://www.kaggle.com/competitions/nlp-getting-started/data)
 - `disaster_target.csv`: Please refer to emergency.csv file.
 - `hotel_review.csv`: You can download it from: [here](https://www.yelp.com/dataset)
-- `news.csv`: You can download it from: [here](https://msnews.github.io/)
-- `reddit.csv`: You can download `RS_2019-03.zst` and `RS_2019-04.zst` from: [here](https://academictorrents.com/details/ba051999301b109eab37d16f027b3f49ade2de13/tech&hit=1&filelist=1)
+- `review_source.csv` and `review_target.csv`: You can download it from: [here](https://msnews.github.io/)
+- `socialmedia_source.csv` and `socialmedia_target.csv`: You can download `RS_2019-03.zst` and `RS_2019-04.zst` from: [here](https://academictorrents.com/details/ba051999301b109eab37d16f027b3f49ade2de13/tech&hit=1&filelist=1)
 
 ## Setups
 
