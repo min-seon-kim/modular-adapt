@@ -5,7 +5,7 @@
 Datasets are used in the following file structure:
 
 ```
-│modular-adapt/
+│modular-model-adapt/
 ├──data/
 │  ├── cybersecurity
 │  │   ├── cybersecurity_source.csv
