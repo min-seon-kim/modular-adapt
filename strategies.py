@@ -64,7 +64,6 @@ def update_model_by_strategy(model, custom_tokenizer, evolving_event, base_model
         y_train = to_categorical(label_list)
         x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=0.2, shuffle=True)
 
-        # Word embedding update
         vectorList = []
         for word in new_model_wv.index2word:
             vectorList.append(new_model_wv.get_vector(word))
@@ -123,7 +122,6 @@ def update_model_by_strategy(model, custom_tokenizer, evolving_event, base_model
         y_train = to_categorical(label_list)
         x_train, x_test, y_train, y_test = train_test_split(x_train, y_train, test_size=0.2, shuffle=True)
         
-        # Word embedding update
         vectorList = []
         for word in new_model_wv.index2word:
             vectorList.append(new_model_wv.get_vector(word))

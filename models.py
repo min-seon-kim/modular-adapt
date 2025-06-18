@@ -3,7 +3,41 @@ from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import *
-    
+from sklearn.neighbors import KernelDensity
+
+class OnlineOODDetector:
+    def __init__(self, alpha=0.05, tau=3.0, epsilon=1e-6):
+        self.alpha = alpha
+        self.tau = tau
+        self.epsilon = epsilon
+        self.kde = None
+        self.mu = None
+        self.sigma = None
+
+    def initialize(self, indicator_samples):
+        self.kde = KernelDensity(kernel='gaussian', bandwidth=2.0)
+        self.kde.fit(indicator_samples)
+        log_density = self.kde.score_samples(indicator_samples)
+        energy = -log_density
+        self.mu = np.mean(energy)
+        self.sigma = np.mean(np.abs(energy - self.mu))
+
+    def compute_energy(self, x):
+        log_density = self.kde.score_samples(x)
+        return -log_density[0]
+
+    def update_statistics(self, energy):
+        delta = abs(energy - self.mu)
+        self.sigma = (1 - self.alpha) * self.sigma + self.alpha * delta
+        self.sigma = max(self.sigma, 1e-3)
+        self.mu = (1 - self.alpha) * self.mu + self.alpha * energy
+
+    def detect(self, x):
+        energy = self.compute_energy(x)
+        z = (energy - self.mu) / (self.sigma + self.epsilon)
+        self.update_statistics(energy)
+        return abs(z) > self.tau, energy, z
+
 
 class TransformerBlock(layers.Layer):
     def __init__(self, embed_dim, num_heads, ff_dim, rate=0.1):
@@ -29,8 +63,8 @@ class TransformerBlock(layers.Layer):
 class TokenAndPositionEmbedding(layers.Layer):
     def __init__(self, maxlen, embedding_matrix):
         super().__init__()
-        self.token_emb = layers.Embedding(embedding_matrix.shape[0], # or len(word_index) + 1
-                                embedding_matrix.shape[1], # or EMBEDDING_DIM,
+        self.token_emb = layers.Embedding(embedding_matrix.shape[0],
+                                embedding_matrix.shape[1],
                                 weights=[embedding_matrix],
                                 input_length=200,
                                 trainable=True)
@@ -68,9 +102,9 @@ def get_lstm_model(embedding_layer):
            
 
 def get_transformer(embedding_matrix):
-    num_heads = 2  # Number of attention heads
-    ff_dim = 32  # Hidden layer size in feed forward network inside transformer
-    maxlen = 200  # Only consider the first 200 words of each sample
+    num_heads = 2
+    ff_dim = 32
+    maxlen = 200
     embed_dim = 100
 
     inputs = layers.Input(shape=(maxlen,))

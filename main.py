@@ -18,7 +18,7 @@ from textblob import Word
 from copy import deepcopy
 from strategies import *
 from models import *
-from nlp_utils import *
+from utils import *
 nltk.download('wordnet')
 nltk.download('stopwords')
 nltk.download('omw-1.4')
@@ -73,7 +73,6 @@ def pretrain(config):
     with open(config.token_path, 'wb') as handle:
         pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-
     embedding_matrix = np.zeros((config.embedding_size, 100))
     for word, idx in tokenizer.word_index.items():
         if idx == config.embedding_size:
@@ -81,8 +80,8 @@ def pretrain(config):
         if word in base_model_wv.vocab.keys():
             embedding_matrix[idx] = base_model_wv.word_vec(word)
 
-    embedding_layer = Embedding(embedding_matrix.shape[0], # or len(word_index) + 1
-                                embedding_matrix.shape[1], # or EMBEDDING_DIM,
+    embedding_layer = Embedding(embedding_matrix.shape[0],
+                                embedding_matrix.shape[1],
                                 weights=[embedding_matrix],
                                 input_length=200,
                                 trainable=False)
@@ -119,9 +118,15 @@ def update(config):
     with open(config.token_path, 'rb') as handle:
         tokenizer = pickle.load(handle)
 
-    origin_keyword = deepcopy(list(tokenizer.word_index.keys())) # keywords that feature extractor has learned
+    indicator_list = list()
+    origin_keyword = deepcopy(list(tokenizer.word_index.keys()))
 
-    for i in range(0, 16000, 2000):
+    # Load models
+    model = tf.keras.models.load_model(os.path.join(config.model_path, f"{config.dataset}_{config.model}_pretrain"))
+    ml_model = load(config.ml_path)
+
+    ood_count = 0
+    for i in range(0, len(min(target_data_pos, target_data_neg)), 2000):
         evolving_event = pd.concat([target_data_pos[i:i+2000],target_data_neg[i:i+2000]]).reset_index(drop=True)
         evolving_event['text'] = evolving_event['text'].apply(lambda x:' '.join(x.lower() for x in x.split()))
         evolving_event['text']= evolving_event['text'].str.replace('[^\w\s]','')
@@ -133,15 +138,15 @@ def update(config):
         previous_word_counts = deepcopy(tokenizer.word_counts)
         previous_word_docs = deepcopy(tokenizer.word_docs)
 
-        from custom_tokenizer import Tokenizer
-        custom_tokenizer = Tokenizer(num_words=1000, previous_word_counts=previous_word_counts, \
+        from custom_tokenizer import Tokenizer as CTokenizer
+        custom_tokenizer = CTokenizer(num_words=1000, previous_word_counts=previous_word_counts, \
                                 previous_word_docs=previous_word_docs, vocabulary=[]) 
         custom_tokenizer.fit_on_texts(evolving_event['text'][:config.event_size/2])
 
         _, new_model_wv = train_w2v_model(evolving_event['text'][:config.event_size/2])
         
         word_dict = sorted(tokenizer.word_counts.items(), key=lambda x: x[1], reverse=True)
-        keywordset = [word_dict[i][0] for i in range(config.keyword_size)] # top 100 keywords
+        keywordset = [word_dict[i][0] for i in range(config.keyword_size)]
 
         # Calculate frequency indicator
         cnt_fre = [sum(evolving_event['text'][:config.event_size/2].apply(lambda x: x.count(i))) for i in keywordset]
@@ -158,10 +163,29 @@ def update(config):
         VOCABULARY_INDICATOR = (config.embedding_size-vocab_cnt)/config.embedding_size
         
         indicators = np.array([[SEMANTIC_INDICATOR, VOCABULARY_INDICATOR, FREQUENCY_INDICATOR]])
+        indicator_list.append(indicators)
 
-        # Load models
-        model = tf.keras.models.load_model(os.path.join(config.model_path, f"{config.dataset}_{config.model}_pretrain"))
-        ml_model = load(config.ml_path)
+        # Detect OOD shift
+        is_ood, energy_score, z_value = detector.detect(indicators)
+        
+        if is_ood:
+            ood_count += 1
+        else:
+            ood_count = 0
+        
+        if ood_count >= 5:
+            recent_df = evolving_event[max(0, i-(4*config.event_size)):i+config.event_size].reset_index(drop=True)
+            ood_tokenizer = Tokenizer(num_words=1000)
+            ood_tokenizer.fit_on_texts(recent_df['text'])
+            ood_word_dict = sorted(ood_tokenizer.word_counts.items(), key=lambda x: x[1], reverse=True)
+            keywordset = [ood_word_dict[i][0] for i in range(config.keyword_size)]
+
+            random_batches = []
+            for _ in range(100):
+                sampled_indices = np.random.choice(recent_df.index, size=config.event_size, replace=False)
+                batch_df = recent_df.loc[sampled_indices].reset_index(drop=True)
+                random_batches.append(batch_df)
+            ml_model, detector = update_stat(model, random_batches, ood_tokenizer, base_model_wv, config)
 
         # Get predicted accuracy
         a_noupdate = 0
